@@ -55,7 +55,7 @@ npx dsh-codex-oauth status
 npx dsh-codex-oauth logout
 ```
 
-Device flow prints a `chatgpt.com/device` code you enter on any device; the CLI waits until you authorize and stores the token in the same file the harness reads.
+Device flow prints a one-time code plus the OpenAI device-verification URL; enter the code on any device, and the CLI waits until you authorize and stores the token in the same file the harness reads.
 
 ## Use Codex
 
