@@ -14,10 +14,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
+import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { AssistantMessageEvent, Model, Api, Context as PiContext, SimpleStreamOptions } from '@earendil-works/pi-ai'
 import * as codexPlugin from '../lib/index.js'
+import { FileCredentialStore } from '../src/store.js'
+import { codexCommand } from '../src/command.js'
 
 const hoisted = vi.hoisted(() => ({
   streamCalls: [] as Array<{ model: Model<Api>; context: PiContext; options: SimpleStreamOptions | undefined }>,
@@ -162,5 +165,47 @@ describe('dsh-codex-oauth Loader composition', () => {
     context = await loadComposition()
     expect(context.get('commands')).toBeUndefined()
     expect(context.llm.listProviders()).toContainEqual({ id: 'codex', name: 'OpenAI Codex' })
+  })
+
+  it('registers the /codex command when the commands service is mounted', async () => {
+    root = await mkdtemp(join(tmpdir(), 'dsh-codex-cmds-'))
+    const configPath = join(root, 'cordis.yml')
+    await writeFile(configPath, [
+      "- name: '@deepseek-ai/dsh-llm'",
+      "- name: '@deepseek-ai/dsh-commands'",
+      "- name: 'dsh-codex-oauth'",
+      '  config:',
+      '    provider: codex',
+      `    storePath: '${join(root, 'codex-oauth.json').replaceAll('\\', '/')}'`,
+      '',
+    ].join('\n'))
+
+    context = new Context()
+    context.baseUrl = pathToFileURL(root).href + '/'
+    await context.plugin(Loader)
+    context.loader.builtins.include = Include
+    const modules = new Map<string, unknown>([
+      ['@deepseek-ai/dsh-llm', LlmRuntime],
+      ['@deepseek-ai/dsh-commands', CommandRuntime],
+      ['dsh-codex-oauth', codexPlugin],
+    ])
+    context.loader.internal = {
+      version: 'v2',
+      async import(specifier: string) {
+        if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
+        return modules.get(specifier)
+      },
+    } as unknown as NonNullable<typeof context.loader.internal>
+    await context.loader.create({
+      name: 'cordis:include',
+      config: { path: pathToFileURL(configPath).href },
+    })
+    await context.loader.await()
+
+    // The plugin registered `codex`; a second registration of the same name
+    // in the same scope must be rejected — proving the effect ran.
+    expect(() => context!.commands.register(codexCommand(new FileCredentialStore(join(root!, 'other.json')))))
+      .toThrow(/already registered/)
+    expect(context!.llm.listProviders()).toContainEqual({ id: 'codex', name: 'OpenAI Codex' })
   })
 })
