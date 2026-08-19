@@ -1,0 +1,6 @@
+# dsh-codex-oauth bundle layer: mounts the Codex OAuth plugin beside the
+# shipped rows. Every field has a Config default; override per field in a later
+# patch layer (profile cordis.patch.yml) by replacing this row's config.
+- insert:
+    - id: codex-oauth
+      name: dsh-codex-oauth

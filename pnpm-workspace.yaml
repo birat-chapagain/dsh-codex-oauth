@@ -1,0 +1,6 @@
+# The plugin repo is its own pnpm workspace root so installs here never walk
+# up into a surrounding monorepo checkout.
+packages: []
+allowBuilds:
+  '@google/genai': set this to true or false
+  protobufjs: set this to true or false
