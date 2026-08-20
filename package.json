@@ -36,8 +36,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "prepare": "node node_modules/typescript/bin/tsc -p tsconfig.build.json && node --input-type=module -e \"import { chmodSync } from 'node:fs'; chmodSync('lib/bin.js', 0o755)\"",
     "build": "node node_modules/typescript/bin/tsc -p tsconfig.build.json && node --input-type=module -e \"import { chmodSync } from 'node:fs'; chmodSync('lib/bin.js', 0o755)\"",
+    "prepack": "npm run build",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run build && node node_modules/vitest/vitest.mjs run"
   },

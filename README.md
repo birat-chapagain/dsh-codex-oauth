@@ -21,14 +21,13 @@ The package is a dsh **bundle**. Install it into a profile:
 dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
 ```
 
-pnpm ≥10 refuses to run a git dependency's `prepare` build script until you allow it once. The first `add` prints the exact key; copy it into the profile's `pnpm-workspace.yaml`:
+The repository ships its prebuilt `lib/` and runs no build scripts at install time, so this works with no `allowBuilds` permission. Pin a commit for reproducibility if you prefer (`github:birat-chapagain/dsh-codex-oauth#<sha>`).
 
-```yaml
-allowBuilds:
-  dsh-codex-oauth: true
+Alternatively, install a release tarball (also no build permission):
+
+```sh
+dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz
 ```
-
-then re-run the `add`. This permission runs this package's build at install time — pin a commit if you prefer (`github:birat-chapagain/dsh-codex-oauth#<sha>`). Installing from npm or a packed tarball needs no such allowance.
 
 The profile manifest ends up listing the bundle after `@deepseek-ai/dsh-base`; verify the composed tree without booting:
 
