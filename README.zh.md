@@ -15,21 +15,23 @@
 
 ## 安装
 
-本包是一个 dsh **bundle**。安装进一个 profile：
+一条命令把 bundle 装进 `web` profile（自动写入一次性的 pnpm 构建授权，并替你执行 `dsh plugin add`）：
 
 ```sh
-dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
+npx --yes https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz install
 ```
 
-仓库自带编译好的 `lib/`，安装时不执行任何构建脚本，因此不需要 `allowBuilds` 授权。想要可复现性可以锁 commit（`github:birat-chapagain/dsh-codex-oauth#<sha>`）。
+然后重启 `dsh web`，运行一次 `/codex login`。
 
-也可以用发布包（同样无需构建授权）：
+等价的手动方式（都使用预构建产物，无需构建授权）：
 
 ```sh
 dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz
+# 或从 git 安装（建议锁 commit：github:…/…#<sha>）：
+dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
 ```
 
-如果 pnpm 11.22+ 因传递依赖的未批准构建脚本而报 `ERR_PNPM_IGNORED_BUILDS`（pi-ai 的依赖树里有 `@google/genai` 与 `protobufjs` 两个带构建脚本的包，Codex 路径并不会用到它们），把下面这段一次性写进 profile 的 `pnpm-workspace.yaml` 再重跑 `add`：
+pnpm 11.22+ 会因为任一传递依赖有未批准的构建脚本而报错——pi-ai 的依赖树里有 `@google/genai` 与 `protobufjs` 两个（Codex 路径均不使用）。一键安装器会自动写好授权；手动安装若以 `ERR_PNPM_IGNORED_BUILDS` 结束，把这段一次性写进 profile 的 `pnpm-workspace.yaml` 再重跑：
 
 ```yaml
 allowBuilds:

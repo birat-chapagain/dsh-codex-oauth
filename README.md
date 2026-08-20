@@ -15,15 +15,23 @@ The upstream harness's multi-provider adapter deliberately withholds `openai-cod
 
 ## Install
 
-The package is a dsh **bundle**. Install it into a profile:
+One command installs the bundle into the `web` profile (it writes the one-time pnpm build approvals and runs `dsh plugin add` for you):
 
 ```sh
+npx --yes https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz install
+```
+
+Then restart `dsh web` and run `/codex login` once.
+
+Manual alternatives (same effect, both use prebuilt artifacts with no build permission):
+
+```sh
+dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz
+# or, from git (pin a commit for reproducibility: github:…/…#<sha>):
 dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
 ```
 
-The repository ships its prebuilt `lib/` and runs no build scripts at install time, so this works with no `allowBuilds` permission. Pin a commit for reproducibility if you prefer (`github:birat-chapagain/dsh-codex-oauth#<sha>`).
-
-pnpm 11.22+ also hard-fails when *any* transitive dependency has an unapproved build script — pi-ai's tree carries two (`@google/genai`, `protobufjs`, both unused by the Codex route). If the `add` ends with `ERR_PNPM_IGNORED_BUILDS`, add this one-time snippet to the profile's `pnpm-workspace.yaml` and re-run:
+pnpm 11.22+ hard-fails when any transitive dependency has an unapproved build script — pi-ai's tree carries two (`@google/genai`, `protobufjs`, both unused by the Codex route). The one-command installer writes the approvals for you; a manual install that ends with `ERR_PNPM_IGNORED_BUILDS` just needs this one-time snippet in the profile's `pnpm-workspace.yaml`:
 
 ```yaml
 allowBuilds:
@@ -32,12 +40,6 @@ allowBuilds:
 ```
 
 (If pnpm prints different exact keys in its error, use those — the printed keys are authoritative.)
-
-Alternatively, install a release tarball (also no build permission):
-
-```sh
-dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz
-```
 
 The profile manifest ends up listing the bundle after `@deepseek-ai/dsh-base`; verify the composed tree without booting:
 

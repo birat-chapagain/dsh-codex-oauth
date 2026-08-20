@@ -17,11 +17,10 @@ export declare const ALLOW_BUILDS: Readonly<Record<string, true>>;
 /** The default target profile of the product CLI. */
 export declare const DEFAULT_PROFILE = "web";
 /**
- * The package spec the installer hands to `dsh plugin add`.
- * Pinned to a commit so a later push cannot change what a user installs;
- * bump here when releasing.
+ * The package spec the installer hands to `dsh plugin add`: the published
+ * release tarball, the same artifact the one-line installer itself runs from.
  */
-export declare const INSTALL_SPEC = "github:birat-chapagain/dsh-codex-oauth";
+export declare const INSTALL_SPEC = "https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz";
 /** One planned or performed installer action, for display and dry runs. */
 export interface InstallStep {
     /** What this step does or did. */
