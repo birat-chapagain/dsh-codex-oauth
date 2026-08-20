@@ -145,6 +145,8 @@ describe('dsh-codex-oauth Loader composition', () => {
     expect(chunks.at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
     expect(chunks).toContainEqual({ type: 'usage', usage: { inputTokens: 1, outputTokens: 2 } })
     expect(hoisted.streamCalls).toHaveLength(1)
+    // The row omits `transport`, so the schema default (sse) must reach the stream.
+    expect(hoisted.streamCalls[0]!.options?.transport).toBe('sse')
     expect(hoisted.streamCalls[0]!.context).toEqual({
       systemPrompt: 'compose',
       messages: [{ role: 'user', content: 'hello', timestamp: 0 }],

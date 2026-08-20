@@ -30,7 +30,12 @@ export interface Config {
   provider: string
   /** Credential store path; defaults to `$DSH_HOME/codex-oauth.json`. */
   storePath?: string
-  /** Codex Responses transport; `auto` lets pi-ai select per request. */
+  /**
+   * Codex Responses transport. Defaults to `sse`: pi-ai's WebSocket session
+   * reuse keeps a connection open after a one-shot headless turn and the
+   * process never exits; opt into `websocket` (or `websocket-cached`) for
+   * long-lived interactive sessions that benefit from connection reuse.
+   */
   transport: 'sse' | 'websocket' | 'websocket-cached' | 'auto'
   /** Prompt-cache retention preference for session-cached Codex requests. */
   cacheRetention: 'none' | 'short' | 'long'
@@ -39,7 +44,7 @@ export interface Config {
 export const Config: Schema<Config> = Schema.object({
   provider: Schema.string().default('codex'),
   storePath: Schema.string(),
-  transport: Schema.union(['sse', 'websocket', 'websocket-cached', 'auto']).default('auto'),
+  transport: Schema.union(['sse', 'websocket', 'websocket-cached', 'auto']).default('sse'),
   cacheRetention: Schema.union(['none', 'short', 'long']).default('long'),
 })
 

@@ -76,7 +76,7 @@ Per-session selection in the Web UI needs no patch. Provider, model, and capabil
 |---|---|---|
 | `provider` | `codex` | Provider route id the adapter registers. |
 | `storePath` | `$DSH_HOME/codex-oauth.json` | OAuth credential store location. |
-| `transport` | `auto` | Codex Responses transport: `sse`, `websocket`, `websocket-cached`, or `auto`. |
+| `transport` | `sse` | Codex Responses transport: `sse`, `websocket`, `websocket-cached`, or `auto`. `sse` exits cleanly after one-shot headless turns; `websocket`/`websocket-cached` reuse the connection for long interactive sessions but keep one-shot processes alive. |
 | `cacheRetention` | `long` | pi-ai prompt-cache retention: `none`, `short`, `long`. |
 
 Override in a later patch layer (profile `cordis.patch.yml` replaces this row's whole `config`):
