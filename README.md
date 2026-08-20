@@ -23,6 +23,16 @@ dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
 
 The repository ships its prebuilt `lib/` and runs no build scripts at install time, so this works with no `allowBuilds` permission. Pin a commit for reproducibility if you prefer (`github:birat-chapagain/dsh-codex-oauth#<sha>`).
 
+pnpm 11.22+ also hard-fails when *any* transitive dependency has an unapproved build script — pi-ai's tree carries two (`@google/genai`, `protobufjs`, both unused by the Codex route). If the `add` ends with `ERR_PNPM_IGNORED_BUILDS`, add this one-time snippet to the profile's `pnpm-workspace.yaml` and re-run:
+
+```yaml
+allowBuilds:
+  '@google/genai': true
+  protobufjs: true
+```
+
+(If pnpm prints different exact keys in its error, use those — the printed keys are authoritative.)
+
 Alternatively, install a release tarball (also no build permission):
 
 ```sh
