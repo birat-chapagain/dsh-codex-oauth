@@ -2,19 +2,25 @@
  * One-command installer support.
  *
  * `dsh-codex-oauth install` removes the two friction points of the manual
- * flow: it writes the one-time `allowBuilds` approval for pi-ai's transitive
+ * flow: it writes the one-time pnpm build approvals for pi-ai's transitive
  * build scripts (both unused by the Codex route) into the profile's
  * `pnpm-workspace.yaml`, then shells out to `dsh plugin add` with the same
  * package spec.
  *
- * The YAML edit is strictly additive: it never rewrites the document, only
- * appends the two keys (or a new `allowBuilds:` block) when they are absent.
+ * pnpm 11 reads these approvals from an `allowBuilds` map; pnpm 10 read the
+ * equivalent `onlyBuiltDependencies` list, so the installer writes both and
+ * keeps them in sync. The edit is a normalization, not a blind append: it
+ * also repairs the common failure where pnpm's suggested snippet was pasted
+ * verbatim with its `set this to true or false` placeholders, which pnpm
+ * treats as a denial.
  *
  * @module dsh-codex-oauth/install
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
+import { isMap, isScalar, isSeq, parseDocument, type Document } from 'yaml'
 
 /** The one-time approvals pnpm 11.22+ demands for pi-ai's transitive deps. */
 export const ALLOW_BUILDS: Readonly<Record<string, true>> = Object.freeze({
@@ -26,10 +32,11 @@ export const ALLOW_BUILDS: Readonly<Record<string, true>> = Object.freeze({
 export const DEFAULT_PROFILE = 'web'
 
 /**
- * The package spec the installer hands to `dsh plugin add`: the published
- * release tarball, the same artifact the one-line installer itself runs from.
+ * The package spec the installer hands to `dsh plugin add`. Pinned per
+ * release instead of `latest/download` so a previously fetched URL can never
+ * serve a stale CDN copy of the installer itself.
  */
-export const INSTALL_SPEC = 'https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz'
+export const INSTALL_SPEC = 'https://github.com/birat-chapagain/dsh-codex-oauth/releases/download/v0.1.5/dsh-codex-oauth.tgz'
 
 /** One planned or performed installer action, for display and dry runs. */
 export interface InstallStep {
@@ -39,46 +46,107 @@ export interface InstallStep {
   readonly changed: boolean
 }
 
-/** Render one allowBuilds key, quoted only when YAML needs it. */
-function keyLine(key: string, indent: string): string {
-  const rendered = /[/@]/u.test(key) ? `'${key}'` : key
-  return `${indent}${rendered}: true`
+/**
+ * What dsh's own `initProfile` writes for a fresh profile; reproduced here
+ * because `dsh plugin add` skips its template once the file exists.
+ */
+const PROFILE_WORKSPACE_TEMPLATE = `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: false
+`
+
+/** Scalar string items of a YAML sequence node. */
+function stringItems(node: unknown): string[] {
+  if (!isSeq(node)) return []
+  const items: string[] = []
+  for (const item of node.items) {
+    if (isScalar(item) && typeof item.value === 'string') items.push(item.value)
+  }
+  return items
 }
 
 /**
- * Ensure the profile's `pnpm-workspace.yaml` carries every {@link ALLOW_BUILDS}
- * key, creating the file when missing. The edit is append-only; existing
- * content is never rewritten.
+ * The package names an `allowBuilds` node approves, whatever its form: a map
+ * contributes its keys (values are rewritten to `true` below), a list its
+ * items, and a missing node none. Returns undefined when the node is present
+ * but neither a map nor a list, so the caller can fail loud instead of
+ * silently discarding an unusable setting.
+ * @param allow - the `allowBuilds` node, or undefined when absent.
+ * @returns the approved names, or undefined for an unusable node.
+ */
+function approvedNames(allow: unknown): string[] | undefined {
+  if (allow === null || allow === undefined) return []
+  if (isSeq(allow)) return stringItems(allow)
+  if (!isMap(allow)) return undefined
+  const names: string[] = []
+  for (const pair of allow.items) {
+    if (isScalar(pair.key) && typeof pair.key.value === 'string') names.push(pair.key.value)
+  }
+  return names
+}
+
+/** One trailing newline, whatever the source had. */
+function normalized(text: string): string {
+  return text.replace(/\n*$/u, '\n')
+}
+
+/**
+ * Ensure the profile's `pnpm-workspace.yaml` approves every
+ * {@link ALLOW_BUILDS} package. Creates the file with dsh's profile template
+ * when missing, otherwise preserves every unrelated key and comment while
+ * normalizing the two approval keys: `allowBuilds` becomes a sorted map with
+ * `true` values (list form, placeholder text, and explicit `false` values
+ * are repaired), and `onlyBuiltDependencies` becomes the matching sorted list.
  * @param workspaceFile - absolute path to the profile's pnpm-workspace.yaml.
  * @returns the step describing what happened.
  */
 export async function ensureAllowBuilds(workspaceFile: string): Promise<InstallStep> {
-  let text = ''
+  let text: string
   try {
     text = await readFile(workspaceFile, 'utf8')
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException | null)?.code !== 'ENOENT') throw error
+    text = PROFILE_WORKSPACE_TEMPLATE
   }
-  const present = (key: string): boolean =>
-    new RegExp(`^\\s*['"]?${key}['"]?\\s*:`, 'mu').test(text)
-  const missing = Object.keys(ALLOW_BUILDS).filter(key => !present(key))
-  if (missing.length === 0) {
+  if (text.trim() === '') text = PROFILE_WORKSPACE_TEMPLATE
+  const doc: Document.Parsed = parseDocument(text)
+  if (doc.errors.length > 0) {
+    throw new Error(`cannot parse ${workspaceFile}: ${doc.errors[0]!.message} — fix or remove the file, then re-run`)
+  }
+  if (!isMap(doc.contents)) {
+    throw new Error(`${workspaceFile} is not a YAML mapping — remove it so the installer can write a fresh one`)
+  }
+
+  const wanted = Object.keys(ALLOW_BUILDS)
+  const allow = doc.get('allowBuilds', true)
+  const names = approvedNames(allow)
+  if (names === undefined) {
+    throw new Error(`allowBuilds in ${workspaceFile} is not a map or list of package names — remove it and re-run`)
+  }
+  const approved = new Set<string>(wanted)
+  for (const name of names) approved.add(name)
+  for (const name of stringItems(doc.get('onlyBuiltDependencies', true))) approved.add(name)
+
+  const placeholder = isMap(allow) && wanted.some((name) => {
+    const entry = allow.get(name, true)
+    return entry !== undefined && !(isScalar(entry) && entry.value === true)
+  })
+  const before = normalized(String(doc))
+  const sorted = [...approved].sort()
+  doc.set('allowBuilds', doc.createNode(Object.fromEntries(sorted.map(name => [name, true]))))
+  doc.set('onlyBuiltDependencies', doc.createNode(sorted))
+  const after = normalized(String(doc))
+  if (after === before) {
     return { text: `build approvals already present in ${workspaceFile}`, changed: false }
   }
-  let next = text
-  if (/\ballowBuilds\s*:/u.test(next)) {
-    next = next.replace(/(^|\n)(\s*)allowBuilds\s*:/u, (_match, lead: string, indent: string) => {
-      const lines = missing.map(key => keyLine(key, `${indent}  `)).join('\n')
-      return `${lead}${indent}allowBuilds:\n${lines}`
-    })
-  } else {
-    const block = `allowBuilds:\n${missing.map(key => keyLine(key, '  ')).join('\n')}\n`
-    next = text.length > 0 && !text.endsWith('\n') ? `${text}\n${block}` : `${text}${block}`
-  }
   await mkdir(dirname(workspaceFile), { recursive: true })
-  await writeFile(workspaceFile, next, 'utf8')
+  await writeFileAtomic(workspaceFile, after, { mode: 0o644 })
   return {
-    text: `wrote build approvals for ${missing.join(', ')} to ${workspaceFile}`,
+    text: placeholder
+      ? `corrected build approval values in ${workspaceFile}`
+      : `wrote build approvals (${wanted.join(', ')}) to ${workspaceFile}`,
     changed: true,
   }
 }

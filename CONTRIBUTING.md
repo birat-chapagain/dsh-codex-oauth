@@ -14,10 +14,10 @@ npm test          # builds lib/ first, then runs vitest
 
 ## Release checklist
 
-1. Bump `version` in `package.json`.
+1. Bump `version` in `package.json`, and pin `INSTALL_SPEC` in `src/install.ts` plus the install commands in both READMEs to the new `releases/download/v<version>/dsh-codex-oauth.tgz` URL (version-pinned URLs guarantee a fresh artifact; `latest/download` can serve a stale cached copy).
 2. `npm test` (builds `lib/`, runs all suites).
 3. Commit source + rebuilt `lib/` together, push to `main`.
-4. `npm pack`, then attach the tarball to a GitHub release named `dsh-codex-oauth.tgz` so the `releases/latest/download/dsh-codex-oauth.tgz` install URL keeps working.
+4. `npm pack`, then attach the tarball to the GitHub release as the asset `dsh-codex-oauth.tgz`.
 
 ## Tests
 

@@ -2,13 +2,17 @@
  * One-command installer support.
  *
  * `dsh-codex-oauth install` removes the two friction points of the manual
- * flow: it writes the one-time `allowBuilds` approval for pi-ai's transitive
+ * flow: it writes the one-time pnpm build approvals for pi-ai's transitive
  * build scripts (both unused by the Codex route) into the profile's
  * `pnpm-workspace.yaml`, then shells out to `dsh plugin add` with the same
  * package spec.
  *
- * The YAML edit is strictly additive: it never rewrites the document, only
- * appends the two keys (or a new `allowBuilds:` block) when they are absent.
+ * pnpm 11 reads these approvals from an `allowBuilds` map; pnpm 10 read the
+ * equivalent `onlyBuiltDependencies` list, so the installer writes both and
+ * keeps them in sync. The edit is a normalization, not a blind append: it
+ * also repairs the common failure where pnpm's suggested snippet was pasted
+ * verbatim with its `set this to true or false` placeholders, which pnpm
+ * treats as a denial.
  *
  * @module dsh-codex-oauth/install
  */
@@ -17,10 +21,11 @@ export declare const ALLOW_BUILDS: Readonly<Record<string, true>>;
 /** The default target profile of the product CLI. */
 export declare const DEFAULT_PROFILE = "web";
 /**
- * The package spec the installer hands to `dsh plugin add`: the published
- * release tarball, the same artifact the one-line installer itself runs from.
+ * The package spec the installer hands to `dsh plugin add`. Pinned per
+ * release instead of `latest/download` so a previously fetched URL can never
+ * serve a stale CDN copy of the installer itself.
  */
-export declare const INSTALL_SPEC = "https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz";
+export declare const INSTALL_SPEC = "https://github.com/birat-chapagain/dsh-codex-oauth/releases/download/v0.1.5/dsh-codex-oauth.tgz";
 /** One planned or performed installer action, for display and dry runs. */
 export interface InstallStep {
     /** What this step does or did. */
@@ -29,9 +34,12 @@ export interface InstallStep {
     readonly changed: boolean;
 }
 /**
- * Ensure the profile's `pnpm-workspace.yaml` carries every {@link ALLOW_BUILDS}
- * key, creating the file when missing. The edit is append-only; existing
- * content is never rewritten.
+ * Ensure the profile's `pnpm-workspace.yaml` approves every
+ * {@link ALLOW_BUILDS} package. Creates the file with dsh's profile template
+ * when missing, otherwise preserves every unrelated key and comment while
+ * normalizing the two approval keys: `allowBuilds` becomes a sorted map with
+ * `true` values (list form, placeholder text, and explicit `false` values
+ * are repaired), and `onlyBuiltDependencies` becomes the matching sorted list.
  * @param workspaceFile - absolute path to the profile's pnpm-workspace.yaml.
  * @returns the step describing what happened.
  */

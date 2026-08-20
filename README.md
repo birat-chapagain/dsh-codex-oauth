@@ -18,7 +18,7 @@ The upstream harness's multi-provider adapter deliberately withholds `openai-cod
 One command installs the bundle into the `web` profile (it writes the one-time pnpm build approvals and runs `dsh plugin add` for you):
 
 ```sh
-npx --yes https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz install
+npx --yes https://github.com/birat-chapagain/dsh-codex-oauth/releases/download/v0.1.5/dsh-codex-oauth.tgz install
 ```
 
 Then restart `dsh web` and run `/codex login` once.
@@ -26,12 +26,12 @@ Then restart `dsh web` and run `/codex login` once.
 Manual alternatives (same effect, both use prebuilt artifacts with no build permission):
 
 ```sh
-dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/latest/download/dsh-codex-oauth.tgz
+dsh plugin --profile web add https://github.com/birat-chapagain/dsh-codex-oauth/releases/download/v0.1.5/dsh-codex-oauth.tgz
 # or, from git (pin a commit for reproducibility: github:…/…#<sha>):
 dsh plugin --profile web add github:birat-chapagain/dsh-codex-oauth
 ```
 
-pnpm 11.22+ hard-fails when any transitive dependency has an unapproved build script — pi-ai's tree carries two (`@google/genai`, `protobufjs`, both unused by the Codex route). The one-command installer writes the approvals for you; a manual install that ends with `ERR_PNPM_IGNORED_BUILDS` just needs this one-time snippet in the profile's `pnpm-workspace.yaml`:
+pnpm 11.22+ hard-fails when any transitive dependency has an unapproved build script — pi-ai's tree carries two (`@google/genai`, `protobufjs`, both unused by the Codex route). The one-command installer writes the approvals for you (and repairs a snippet pasted from pnpm's suggestion with its `set this to true or false` placeholders); a manual install that ends with `ERR_PNPM_IGNORED_BUILDS` just needs this one-time snippet in the profile's `pnpm-workspace.yaml`:
 
 ```yaml
 allowBuilds:
